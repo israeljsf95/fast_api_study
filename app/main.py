@@ -10,12 +10,13 @@ from psycopg2.extras import RealDictCursor
 import time
 
 # uvicorn app.main:app --reload (this is necessary because the '.' means that we are trying bring )
-
+# DB Name -> fastapi_db
+# DB PAss -> "1234"
 app = FastAPI()
 
 
 class Post(BaseModel):
-    
+    #This is my schema of my DataBank
     title: str
     content: str
     published: bool = True
@@ -27,7 +28,7 @@ while True:
                         user = "postgres", password = "1234",
                         cursor_factory = RealDictCursor)
         cursor = conn.cursor()
-        print("database connection succesfull!!")
+        print("database connection was succesfull!!")
         break
     except Exception as error: 
         print("Connecting to database failed!")
@@ -93,21 +94,50 @@ def get_post(id: int, response: Response):
                     * 
                 from fastapi_project 
                 where id = %s """
-    cursor.execute(query, (str(id)))
+                
+    cursor.execute(query, (str(id), ))
     post = cursor.fetchone()
     print(post)
     # post = find_post(id)
     if not post:
         raise HTTPException(status.HTTP_404_NOT_FOUND, 
-                            detail = f"post com id: {id} não encontrado")
+                            detail = f"post with id: {id} not found")
         # response.status_code = status.HTTP_404_NOT_FOUND
         # return {"message": f"post com o id: {id} não encontrado"}
     return {"post_detail": post}
 
 
 @app.delete('/posts/{id}', status_code = status.HTTP_204_NO_CONTENT)
-def delete_post(id):
-    idx = find_idx(int(id))
+def delete_post(id: int, ):
+    """ idx = find_idx(int(id))
     del my_posts[idx]
-    print(my_posts)
-    return {"message: post foi deletado com sucesso"}
+    print(my_posts) """
+    query = """ delete from fastapi_project
+                where id = %s returning *
+             """
+    cursor.execute(query, str(id))
+    deleted_post = cursor.fetchone()
+    if deleted_post == None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, 
+                            detail = f"post with id: {id} not found")
+    print(deleted_post)
+
+    return {"message: post deleted with success"}
+
+
+@app.put("/posts/{id}")
+def update_post(id: int, post: Post):
+
+    query = """
+                update fastapi_project set title = %s, content = %s, published = %s 
+                where id = %s
+                returning *
+    """
+    cursor.execute(query, (post.title, post.content, post.published, str(id)))
+    updated_post = cursor.fetchone()
+    conn.commit()
+    if updated_post == None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, 
+                            detail = f"post with id: {id} not found")
+
+    
