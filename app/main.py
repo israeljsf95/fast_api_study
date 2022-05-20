@@ -2,18 +2,29 @@
 from fastapi import FastAPI, Response, status, HTTPException
 from fastapi.params import Body
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, final
 from random import randrange
 
 import psycopg2 as pp
 from psycopg2.extras import RealDictCursor
 import time
+from . import models
+from .database import SessionLocal, engine
+
+models.Base.metadata.create_all(bind = engine)
 
 # uvicorn app.main:app --reload (this is necessary because the '.' means that we are trying bring )
 # DB Name -> fastapi_db
 # DB PAss -> "1234"
 app = FastAPI()
 
+#Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 class Post(BaseModel):
     #This is my schema of my DataBank
@@ -140,4 +151,4 @@ def update_post(id: int, post: Post):
         raise HTTPException(status.HTTP_404_NOT_FOUND, 
                             detail = f"post with id: {id} not found")
 
-    
+    return {"message: post updated with success"}
