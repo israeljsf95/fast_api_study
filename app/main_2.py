@@ -1,4 +1,5 @@
 
+from pyexpat import model
 from fastapi import FastAPI, Response, status, HTTPException, Depends
 from fastapi.params import Body
 from pydantic import BaseModel
@@ -75,42 +76,42 @@ def get_post(id: int, db: Session = Depends(get_db)):
     #possible entrie that satisfies the condition inside the filter statement. To avoid the overload of this kind of operation
     #, as we know that we have only id by post, it is better change the .all to .first
     post = db.query(models.Post).filter(models.Post.id == str(id)).first()
-    print(post)
+    if not post:
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, 
+                            detail= f'post with {id} not found')
     
     return {"post_detail": post}
 
 
-# @app.delete('/posts/{id}', status_code = status.HTTP_204_NO_CONTENT)
-# def delete_post(id: int, ):
-#     """ idx = find_idx(int(id))
-#     del my_posts[idx]
-#     print(my_posts) """
-#     query = """ delete from fastapi_project
-#                 where id = %s returning *
-#              """
-#     cursor.execute(query, str(id))
-#     deleted_post = cursor.fetchone()
-#     if deleted_post == None:
-#         raise HTTPException(status.HTTP_404_NOT_FOUND, 
-#                             detail = f"post with id: {id} not found")
-#     print(deleted_post)
+@app.delete('/posts/{id}', status_code = status.HTTP_204_NO_CONTENT)
+def delete_post(id: int, db: Session = Depends(get_db)):
+    
+    post = db.query(models.Post).filter(models.Post.id == id)
+    
+    
+    
+    if post.first() == None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, 
+                            detail = f"post with id: {id} not found")
+    else:
+        post.delete(synchronize_session = False)
+        db.commit()
+    
+    
+    return {"message: post deleted with success"}
 
-#     return {"message: post deleted with success"}
 
+@app.put("/posts/{id}")
+def update_post(id: int, post: Post, db: Session = Depends(get_db)):
 
-# @app.put("/posts/{id}")
-# def update_post(id: int, post: Post):
-
-#     query = """
-#                 update fastapi_project set title = %s, content = %s, published = %s 
-#                 where id = %s
-#                 returning *
-#     """
-#     cursor.execute(query, (post.title, post.content, post.published, str(id)))
-#     updated_post = cursor.fetchone()
-#     conn.commit()
-#     if updated_post == None:
-#         raise HTTPException(status.HTTP_404_NOT_FOUND, 
-#                             detail = f"post with id: {id} not found")
-
-#     return {"message: post updated with success"}
+    post_query = db.query(models.Post).filter(models.Post.id == id)
+    
+    
+    if post_query.first() == None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, 
+                            detail = f"post with id: {id} not found")
+    else:
+        post_query.update(post.dict(), synchronize_session = False)
+        db.commit()
+    
+    return {"message: post updated with success"}
