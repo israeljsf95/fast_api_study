@@ -9,8 +9,15 @@ import psycopg2 as pp
 from psycopg2.extras import RealDictCursor
 import time
 from . import models
-from .database import SessionLocal, engine
+from .database import SessionLocal, engine, get_db
 from sqlalchemy.orm import Session
+
+class Post(BaseModel):
+    #This is my schema of my DataBank
+    title: str
+    content: str
+    published: bool = True
+
 
 models.Base.metadata.create_all(bind = engine)
 
@@ -18,14 +25,6 @@ models.Base.metadata.create_all(bind = engine)
 # DB Name -> fastapi_db
 # DB PAss -> "1234"
 app = FastAPI()
-
-#Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 while True: 
 
@@ -44,57 +43,41 @@ while True:
 
 @app.get("/sqlalchemy")
 def test_posts(db:Session = Depends(get_db)):
-    return {"status":"sucessfull"}
-
-
-# @app.get("/posts")
-# def get_posts():
     
-#     #fastapi_project is the name of my table
-#     query = """ select 
-#                     * 
-#                 from fastapi_project"""
-#     cursor.execute(query)
-#     #getting the posts
-#     posts = cursor.fetchall()
-#     return {"data": posts}
+    posts = db.query(models.Post).all()
+    return {"data":posts}
+
+
+@app.get("/posts")
+def get_posts(db: Session = Depends(get_db)):
+    
+    posts = db.query(models.Post).all()
+    return {"data": posts}
 
 # #Mudando o Status Code para criação de um post
-# @app.post('/posts', status_code = status.HTTP_201_CREATED)
-# def create_post(post: Post):
-#     # post_dict = post.dict()
-#     # post_dict['id'] = randrange(0, 10000000)
-#     # my_posts.append(post_dict)
+@app.post('/posts', status_code = status.HTTP_201_CREATED)
+def create_post(post: Post, db: Session = Depends(get_db)):
     
-#     query = """insert into fastapi_project (title, content, published) values (%s, %s, %s) returning * """
-#     #Good Practice to avoid SQL INJECTION
-#     #the second parameter will be the variables that will be marked at the %s
-#     #the order matters
-#     cursor.execute(query, (post.title, post.content, post.published)) 
-#     new_post = cursor.fetchone()
-#     conn.commit()
-#     print(new_post)
-#     return {"data": "created post"}
+    # new_post = models.Post(title = post.title, content = post.content, published = post.published)
+    #unpacking the dictionary makes our program scalable to match a higher number of columns
+    new_post = models.Post(**post.dict())
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
+    return {"data": new_post}
 
-# #{id} é um path-parameter
-# @app.get('/posts/{id}')
-# def get_post(id: int, response: Response):
-#     # Validation with  for / path without parameter
-#     query = """ select 
-#                     * 
-#                 from fastapi_project 
-#                 where id = %s """
-                
-#     cursor.execute(query, (str(id), ))
-#     post = cursor.fetchone()
-#     print(post)
-#     # post = find_post(id)
-#     if not post:
-#         raise HTTPException(status.HTTP_404_NOT_FOUND, 
-#                             detail = f"post with id: {id} not found")
-#         # response.status_code = status.HTTP_404_NOT_FOUND
-#         # return {"message": f"post com o id: {id} não encontrado"}
-#     return {"post_detail": post}
+#{id} é um path-parameter
+@app.get('/posts/{id}')
+def get_post(id: int, db: Session = Depends(get_db)):
+
+    #similar to use where on SQL
+    #is possible to use .all() ->, the problem is that the SQLALCHEMY will continue to look at our bank until match every
+    #possible entrie that satisfies the condition inside the filter statement. To avoid the overload of this kind of operation
+    #, as we know that we have only id by post, it is better change the .all to .first
+    post = db.query(models.Post).filter(models.Post.id == str(id)).first()
+    print(post)
+    
+    return {"post_detail": post}
 
 
 # @app.delete('/posts/{id}', status_code = status.HTTP_204_NO_CONTENT)
